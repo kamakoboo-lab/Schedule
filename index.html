@@ -548,17 +548,17 @@
         bodyHTML += `</div>`;
       }
 
-      // 【修正箇所】カセット印刷文字列生成 (記号だけに色を適用)
+      // カセット印刷文字列生成 (日付と記号の全体に色を適用)
       let cassetteHTML = "";
       if (w.cassettes && w.cassettes.length > 0) {
         cassetteHTML = w.cassettes.map(c => {
           const color = CASSETTE_COLORS[c.symbol] || "#111";
-          return `${formatDateStr(c.date)} カセット : <span style="color: ${color}; font-weight: 800;">${c.symbol}</span>`;
+          return `<span style="color: ${color}; font-weight: 800;">${formatDateStr(c.date)} カセット : ${c.symbol}</span>`;
         }).join("<br>");
       } else {
         cassetteHTML = "カセット : なし";
       }
-
+      
       card.innerHTML = `
         <div class="card-header-print">
           <div class="date-range">${startStr} ➔ ${endStr}</div>
