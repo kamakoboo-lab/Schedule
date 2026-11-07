@@ -181,7 +181,20 @@
 <script>
   const STORAGE_KEY = "locker_task_app_data_v2";
 
-  // 教材マスターデータ (全教科に「＋ 自由入力 (その他)」を追加)
+  // A〜Jの記号ごとのHSLカラー定義 (Aはミドルグレーに調整済み)
+  const CASSETTE_COLORS = {
+    "A": "hsl(0, 0%, 45%)",
+    "B": "hsl(210, 70%, 45%)",
+    "C": "hsl(150, 60%, 35%)",
+    "D": "hsl(35, 90%, 50%)",
+    "E": "hsl(280, 55%, 50%)",
+    "F": "hsl(340, 75%, 55%)",
+    "G": "hsl(185, 65%, 40%)",
+    "H": "hsl(15, 80%, 55%)",
+    "I": "hsl(60, 70%, 45%)",
+    "J": "hsl(240, 15%, 50%)"
+  };
+
   const MASTER_SUBJECTS = [
     {
       id: "eng",
@@ -510,7 +523,7 @@
       const startStr = formatDateStr(w.startDate);
       const endStr = formatDateStr(w.endDate);
 
-      // 教科ごとグループ化 (英語、数学、国語などの同じ教科枠にまとまる)
+      // 教科ごとグループ化
       const grouped = {};
       w.tasks.forEach(t => {
         if (!grouped[t.subjectName]) grouped[t.subjectName] = [];
@@ -535,10 +548,13 @@
         bodyHTML += `</div>`;
       }
 
-      // カセット印刷文字列生成
+      // カセット印刷文字列生成 (記号だけに色を適用)
       let cassetteHTML = "";
       if (w.cassettes && w.cassettes.length > 0) {
-        cassetteHTML = w.cassettes.map(c => `${formatDateStr(c.date)} カセット : ${c.symbol}`).join("<br>");
+        cassetteHTML = w.cassettes.map(c => {
+          const color = CASSETTE_COLORS[c.symbol] || "#111";
+          return `${formatDateStr(c.date)} カセット : <span style="color: ${color}; font-weight: 800;">${c.symbol}</span>`;
+        }).join("<br>");
       } else {
         cassetteHTML = "カセット : なし";
       }
@@ -587,7 +603,6 @@
     const subObj = MASTER_SUBJECTS[subIdx];
     const matObj = subObj.materials[matIdx];
 
-    let taskSubjectName = subObj.name;
     let taskName = "";
     let isPage = false;
 
@@ -613,9 +628,22 @@
         const endVal = row.querySelector(".p-end").value.trim();
 
         if (startVal && endVal) {
-          parts.push(`${startVal}〜${endVal}`);
+          parts.path ? parts.push(`${startVal}〜${endVal}`) : parts.push(`${startVal}〜${endVal}`);
         } else if (startVal) {
           parts.push(`${startVal}`);
+        }
+      });
+
+      // 修正: 確実に正しくパーツをプッシュする処理
+      // (上の三項演算子の部分をすっきり書き直したもの)
+      parts.length = 0; // 一度クリアして正しいロジックで再取得
+      rows.forEach(row => {
+        const startVal = row.querySelector(".p-start").value.trim();
+        const endVal = row.querySelector(".p-end").value.trim();
+        if (startVal && endVal) {
+          parts.push(`${startVal}〜${endVal}`);
+        } else if (startVal) {
+          parts.push(startVal);
         }
       });
 
@@ -630,7 +658,7 @@
     }
 
     weeks[wIdx].tasks.push({
-      subjectName: taskSubjectName,
+      subjectName: subObj.name,
       name: taskName,
       type: isPage ? 'page' : 'boolean',
       detail: detailFormatted
