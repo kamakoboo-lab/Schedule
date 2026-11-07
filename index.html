@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ロッカー用 課題表カード生成アプリ</title>
+  <style>
+    /* 全体基本スタイル (画面表示用) */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f7f7f7; color: #111; padding: 20px; line-height: 1.4; }
+    .container { max-width: 900px; margin: 0 auto; }
+
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #111; }
+    h1 { font-size: 18px; font-weight: 700; }
+    p.sub { font-size: 12px; color: #666; }
+
+    .card { background: #fff; border: 1px solid #e0e0e0; border-radius: 12px; padding: 16px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+    .card-title { font-size: 12px; font-weight: 700; text-transform: uppercase; color: #888; margin-bottom: 12px; letter-spacing: 0.5px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 600px) { .grid-2 { grid-template-columns: 1fr; } }
+
+    label { display: block; font-size: 11px; font-weight: 600; color: #444; margin-bottom: 4px; }
+    input[type="text"], input[type="number"], input[type="date"], select {
+      width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 12px; background: #fff; color: #111;
+    }
+    input:focus, select:focus { outline: none; border-color: #000; }
+
+    button { cursor: pointer; border: none; font-size: 12px; font-weight: 600; border-radius: 6px; padding: 8px 14px; transition: 0.15s; }
+    .btn-black { background: #111; color: #fff; }
+    .btn-black:hover { background: #333; }
+    .btn-outline { background: #fff; border: 1px solid #ccc; color: #333; }
+    .btn-outline:hover { background: #f0f0f0; }
+    .btn-danger { background: #fff; border: 1px solid #fca5a5; color: #dc2626; }
+    .btn-danger:hover { background: #fef2f2; }
+
+    .week-block { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; margin-bottom: 12px; }
+    .week-header { 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: flex-start; 
+      border-bottom: 1px solid #eee; 
+      padding-bottom: 10px; 
+      margin-bottom: 10px; 
+    }
+
+    .task-item { background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 6px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+    .task-form { background: #fff; border: 1px dashed #ccc; border-radius: 6px; padding: 10px; margin-top: 8px; }
+
+    /* カセット授業設定エリア */
+    .cassette-section { background: #fff; border: 1px solid #e5e5e5; border-radius: 6px; padding: 8px 10px; margin-top: 10px; }
+    .cassette-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+
+    .page-range-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+    .page-range-row span { font-size: 12px; color: #555; font-weight: bold; }
+    .page-range-row input[type="number"] { width: 70px; text-align: center; }
+
+    /* 印刷プレビュー領域 (画面上) */
+    .print-preview-section { margin-top: 30px; display: flex; justify-content: center; }
+    .a4-page {
+      width: 210mm;
+      height: 297mm;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 15mm 12mm;
+      display: grid;
+      grid-template-columns: 90.2mm 90.2mm;
+      grid-template-rows: 126.2mm 126.2mm;
+      gap: 10mm 8mm;
+      justify-content: center;
+      align-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+    /* ロッカー貼付用カード (90.2mm x 126.2mm) */
+    .locker-card {
+      width: 90.2mm;
+      height: 126.2mm;
+      border: 1.5px solid #111;
+      border-radius: 4px;
+      padding: 7mm 8mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background: #fff;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .card-header-print {
+      border-bottom: 2px solid #111;
+      padding-bottom: 3px;
+      margin-bottom: 4px;
+    }
+    .card-header-print .date-range { font-size: 11pt; font-weight: 800; letter-spacing: -0.5px; }
+    .card-header-print .sub-info { font-size: 7.5pt; color: #555; display: flex; justify-content: space-between; margin-top: 1px; }
+
+    .card-body-print { flex: 1; overflow: hidden; }
+    .subject-group-print { margin-bottom: 4px; }
+    .subject-title-print { font-size: 8pt; font-weight: 800; background: #111; color: #fff; display: inline-block; padding: 1px 5px; border-radius: 2px; margin-bottom: 2px; }
+
+    .task-line-print {
+      font-size: 8pt;
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 2px;
+      line-height: 1.25;
+    }
+    .checkbox-box {
+      width: 9px; height: 9px; border: 1px solid #111; border-radius: 1px; margin-right: 4px; margin-top: 2px; flex-shrink: 0;
+    }
+    .task-name-print { font-weight: 600; color: #111; }
+    .task-detail-print { color: #444; margin-left: 3px; font-size: 7.5pt; }
+
+    /* カードフッター (カセット表示 & チェック欄) */
+    .card-footer-print {
+      border-top: 1px solid #111;
+      padding-top: 4px;
+      font-size: 7.5pt;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      line-height: 1.3;
+    }
+    .cassette-print-area { font-weight: 700; color: #111; }
+    .complete-check-area { font-weight: 600; color: #555; font-size: 7pt; white-space: nowrap; }
+
+    /* 印刷時スタイル */
+    @media print {
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+      body { background: none; padding: 0; margin: 0; }
+      .no-print { display: none !important; }
+      .print-preview-section { margin: 0; padding: 0; display: block; }
+      .a4-page {
+        border: none;
+        box-shadow: none;
+        margin: 0;
+        padding: 15mm 12mm;
+        width: 210mm;
+        height: 297mm;
+        page-break-after: avoid;
+        page-break-inside: avoid;
+      }
+      .locker-card { border: 1.5px solid #000; page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container no-print">
+  <header>
+    <div>
+      <h1>ロッカー用 課題表カード生成アプリ</h1>
+      <p class="sub">週ごとの課題を選択して、A4用紙（90.2mm×126.2mm×4枚）で印刷できます</p>
+    </div>
+    <div style="display:flex; gap:8px;">
+      <button type="button" class="btn-outline" onclick="resetData()">データを初期化</button>
+      <button type="button" class="btn-black" onclick="window.print()">印刷する (A4用紙)</button>
+    </div>
+  </header>
+
+  <!-- 週選択・作成フォーム -->
+  <div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <div class="card-title" style="margin:0;">登録された週リスト (4枚でA4用紙1枚)</div>
+      <button type="button" id="addWeekBtn" class="btn-outline">＋ 新しい週を追加</button>
+    </div>
+
+    <div id="weeksFormArea"></div>
+  </div>
+</div>
+
+<!-- 印刷プレビュー表示エリア -->
+<div class="print-preview-section">
+  <div class="a4-page" id="a4Preview"></div>
+</div>
+
+<script>
+  const STORAGE_KEY = "locker_task_app_data_v2";
+
+  // 教材マスターデータ (全教科に「＋ 自由入力 (その他)」を追加)
+  const MASTER_SUBJECTS = [
+    {
+      id: "eng",
+      name: "英語",
+      materials: [
+        { name: "ホームリーダー Stories from Shakespeare", type: "boolean" },
+        { name: "Listening Complete 2 定着ノート", type: "page" },
+        { name: "英語構文80", type: "page" },
+        { name: "チャート式基礎からの新々総合英語", type: "page" },
+        { name: "Grand Earth Workbook", type: "page" },
+        { name: "ELEMENT WORKBOOK", type: "page" },
+        { name: "＋ 自由入力 (その他)", type: "custom" }
+      ]
+    },
+    {
+      id: "math",
+      name: "数学",
+      materials: [
+        { name: "4プロセスノート【三角関数】", type: "page" },
+        { name: "4プロセスノート【場合の数と確率】", type: "page" },
+        { name: "4プロセスノート【図形の性質】", type: "page" },
+        { name: "数学問題集 ③", type: "page" },
+        { name: "基本にフォーカス", type: "boolean" },
+        { name: "＋ 自由入力 (その他)", type: "custom" }
+      ]
+    },
+    {
+      id: "jap",
+      name: "国語",
+      materials: [
+        { name: "リード現代文2標準", type: "page" },
+        { name: "現代分長文記述問題集1", type: "page" },
+        { name: "頻出漢字マスター3000", type: "boolean" },
+        { name: "基礎古文", type: "page" },
+        { name: "基礎漢文", type: "page" },
+        { name: "＋ 自由入力 (その他)", type: "custom" }
+      ]
+    },
+    {
+      id: "other",
+      name: "その他",
+      materials: [
+        { name: "＋ 自由入力 (その他)", type: "custom" }
+      ]
+    }
+  ];
+
+  const CASSETTE_SYMBOLS = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"];
+
+  const DEFAULT_WEEKS = [
+    {
+      id: "w1",
+      startDate: "2026-11-09",
+      endDate: "2026-11-16",
+      tasks: [
+        { subjectName: "数学", name: "4プロセスノート【三角関数】", type: "page", detail: "P.40〜47, 54〜55" },
+        { subjectName: "英語", name: "ELEMENT WORKBOOK", type: "page", detail: "P.12〜18" }
+      ],
+      cassettes: [
+        { date: "2026-11-10", symbol: "A" }
+      ]
+    }
+  ];
+
+  let weeks = loadSavedData();
+
+  document.addEventListener("DOMContentLoaded", function() {
+    const addBtn = document.getElementById("addWeekBtn");
+    if (addBtn) {
+      addBtn.addEventListener("click", function() {
+        addWeek();
+      });
+    }
+    renderAll();
+  });
+
+  function renderAll() {
+    saveData();
+    renderForms();
+    renderA4Preview();
+  }
+
+  function renderForms() {
+    const area = document.getElementById("weeksFormArea");
+    area.innerHTML = "";
+
+    weeks.forEach((w, wIdx) => {
+      const block = document.createElement("div");
+      block.className = "week-block";
+
+      let html = `
+        <div class="week-header">
+          <div class="grid-2" style="gap:8px; flex:1; max-width: 500px;">
+            <div>
+              <label>何日から</label>
+              <input type="date" id="start_${wIdx}" value="${w.startDate}">
+            </div>
+            <div>
+              <label>何日まで (提出日)</label>
+              <input type="date" id="end_${wIdx}" value="${w.endDate}">
+            </div>
+          </div>
+          <button type="button" class="btn-danger remove-week-btn" data-index="${wIdx}" style="padding:6px 10px; font-size:11px; white-space:nowrap; margin-left: 10px;">週を削除</button>
+        </div>
+      `;
+
+      // 登録済み課題
+      html += `<div style="margin-bottom:8px;">`;
+      w.tasks.forEach((t, tIdx) => {
+        html += `
+          <div class="task-item">
+            <div>
+              <strong style="color:#111;">[${escapeHtml(t.subjectName)}]</strong> ${escapeHtml(t.name)}
+              <span style="color:#666; font-size:11px; margin-left:6px;">(${t.type === 'page' ? '範囲' : '詳細'}: ${escapeHtml(t.detail || '指定なし')})</span>
+            </div>
+            <button type="button" class="btn-danger remove-task-btn" data-week="${wIdx}" data-task="${tIdx}" style="padding:2px 6px; font-size:10px;">✕</button>
+          </div>
+        `;
+      });
+      html += `</div>`;
+
+      // 課題追加フォーム
+      html += `
+        <div class="task-form">
+          <label>＋ 新しい課題を選択して追加</label>
+          <div class="grid-2" style="margin-bottom:6px;">
+            <select id="subSelect_${wIdx}" class="sub-select" data-index="${wIdx}">
+              ${MASTER_SUBJECTS.map((s, idx) => `<option value="${idx}">${s.name}</option>`).join('')}
+            </select>
+            <select id="matSelect_${wIdx}"></select>
+          </div>
+          
+          <div id="inputFieldArea_${wIdx}" style="margin-bottom:8px;"></div>
+
+          <div style="text-align:right;">
+            <button type="button" class="btn-black add-task-btn" data-index="${wIdx}" style="padding:6px 16px;">課題を追加</button>
+          </div>
+        </div>
+      `;
+
+      // カセット授業設定エリア
+      html += `
+        <div class="cassette-section">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label style="margin:0;">変則時間割 (カセット授業)</label>
+            <button type="button" class="btn-outline" onclick="addCassetteRow(${wIdx})" style="padding:2px 8px; font-size:10px;">＋ カセットを追加</button>
+          </div>
+          <div id="cassetteContainer_${wIdx}">
+      `;
+
+      (w.cassettes || []).forEach((c, cIdx) => {
+        html += `
+          <div class="cassette-row">
+            <input type="date" class="cassette-date" value="${c.date}" style="width:140px;">
+            <span>記号:</span>
+            <select class="cassette-symbol" style="width:60px;">
+              ${CASSETTE_SYMBOLS.map(sym => `<option value="${sym}" ${c.symbol === sym ? 'selected' : ''}>${sym}</option>`).join('')}
+            </select>
+            <button type="button" class="btn-danger" onclick="removeCassette(${wIdx}, ${cIdx})" style="padding:2px 6px; font-size:10px;">✕</button>
+          </div>
+        `;
+      });
+
+      html += `
+          </div>
+        </div>
+      `;
+
+      block.innerHTML = html;
+      area.appendChild(block);
+
+      // イベントリスナー
+      const startInput = document.getElementById(`start_${wIdx}`);
+      const endInput = document.getElementById(`end_${wIdx}`);
+      startInput.addEventListener("change", (e) => { weeks[wIdx].startDate = e.target.value; renderAll(); });
+      endInput.addEventListener("change", (e) => { weeks[wIdx].endDate = e.target.value; renderAll(); });
+
+      const subSelect = document.getElementById(`subSelect_${wIdx}`);
+      const matSelect = document.getElementById(`matSelect_${wIdx}`);
+
+      subSelect.addEventListener("change", (e) => {
+        updateMaterialSelect(wIdx, e.target.value);
+      });
+      matSelect.addEventListener("change", () => {
+        renderDynamicInputs(wIdx);
+      });
+
+      updateMaterialSelect(wIdx, 0);
+      bindCassetteEvents(wIdx);
+    });
+
+    // ボタンリスナーバインド
+    document.querySelectorAll(".remove-week-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => removeWeek(parseInt(e.target.dataset.index, 10)));
+    });
+    document.querySelectorAll(".remove-task-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => removeTask(parseInt(e.target.dataset.week, 10), parseInt(e.target.dataset.task, 10)));
+    });
+    document.querySelectorAll(".add-task-btn").forEach(btn => {
+      btn.addEventListener("click", (e) => addTask(parseInt(e.target.dataset.index, 10)));
+    });
+  }
+
+  function updateMaterialSelect(wIdx, subIdx) {
+    const matSelect = document.getElementById(`matSelect_${wIdx}`);
+    matSelect.innerHTML = MASTER_SUBJECTS[subIdx].materials.map((m, idx) => 
+      `<option value="${idx}">${m.name} ${m.type === 'custom' ? '' : '(' + (m.type === 'page' ? 'ページ' : 'プリント') + ')'}</option>`
+    ).join('');
+    renderDynamicInputs(wIdx);
+  }
+
+  function renderDynamicInputs(wIdx) {
+    const subIdx = document.getElementById(`subSelect_${wIdx}`).value;
+    const matIdx = document.getElementById(`matSelect_${wIdx}`).value;
+    const area = document.getElementById(`inputFieldArea_${wIdx}`);
+    const subObj = MASTER_SUBJECTS[subIdx];
+    const matObj = subObj.materials[matIdx];
+
+    if (matObj.type === 'custom') {
+      area.innerHTML = `
+        <div class="grid-2" style="margin-bottom:6px;">
+          <input type="text" id="customTaskNameInput_${wIdx}" placeholder="教材・課題名 (例: 文法サブテキスト)" style="width:100%;">
+          <select id="customTypeSelect_${wIdx}" onchange="toggleCustomInputType(${wIdx})">
+            <option value="page">ワーク (ページ数管理)</option>
+            <option value="boolean">プリント (提出用/チェックのみ)</option>
+          </select>
+        </div>
+        <div id="customTypeArea_${wIdx}"></div>
+      `;
+      toggleCustomInputType(wIdx);
+    } else if (matObj.type === 'page') {
+      renderPageInputs(area, wIdx);
+    } else {
+      area.innerHTML = `
+        <input type="text" id="printDetailInput_${wIdx}" placeholder="プリント番号・詳細 (例: No.3 両面)" style="width:100%;">
+      `;
+    }
+  }
+
+  function toggleCustomInputType(wIdx) {
+    const type = document.getElementById(`customTypeSelect_${wIdx}`).value;
+    const area = document.getElementById(`customTypeArea_${wIdx}`);
+    if (type === 'page') {
+      renderPageInputs(area, wIdx);
+    } else {
+      area.innerHTML = `
+        <input type="text" id="printDetailInput_${wIdx}" placeholder="プリント番号・詳細 (例: No.3 両面)" style="width:100%;">
+      `;
+    }
+  }
+
+  function renderPageInputs(container, wIdx) {
+    container.innerHTML = `
+      <div id="pageRangesContainer_${wIdx}">
+        <div class="page-range-row">
+          <span>P.</span>
+          <input type="number" class="p-start" placeholder="開始" min="1">
+          <span>〜</span>
+          <input type="number" class="p-end" placeholder="終了" min="1">
+        </div>
+      </div>
+      <button type="button" class="btn-outline" onclick="addPageRangeRow(${wIdx})" style="padding:3px 8px; font-size:10px;">＋ ページ範囲を追加</button>
+    `;
+  }
+
+  function addPageRangeRow(wIdx) {
+    const container = document.getElementById(`pageRangesContainer_${wIdx}`);
+    const row = document.createElement("div");
+    row.className = "page-range-row";
+    row.innerHTML = `
+      <span>P.</span>
+      <input type="number" class="p-start" placeholder="開始" min="1">
+      <span>〜</span>
+      <input type="number" class="p-end" placeholder="終了" min="1">
+      <button type="button" class="btn-danger" onclick="this.parentElement.remove()" style="padding:2px 6px; font-size:10px; margin-left:4px;">✕</button>
+    `;
+    container.appendChild(row);
+  }
+
+  function addCassetteRow(wIdx) {
+    if (!weeks[wIdx].cassettes) weeks[wIdx].cassettes = [];
+    if (weeks[wIdx].cassettes.length >= 2) {
+      alert("カセット授業は1週間に最大2つまで設定できます。");
+      return;
+    }
+    weeks[wIdx].cassettes.push({ date: weeks[wIdx].startDate || "", symbol: "A" });
+    renderAll();
+  }
+
+  function removeCassette(wIdx, cIdx) {
+    weeks[wIdx].cassettes.splice(cIdx, 1);
+    renderAll();
+  }
+
+  function bindCassetteEvents(wIdx) {
+    const container = document.getElementById(`cassetteContainer_${wIdx}`);
+    if (!container) return;
+    const dates = container.querySelectorAll(".cassette-date");
+    const symbols = container.querySelectorAll(".cassette-symbol");
+
+    dates.forEach((el, idx) => {
+      el.addEventListener("change", (e) => {
+        weeks[wIdx].cassettes[idx].date = e.target.value;
+        renderA4Preview();
+        saveData();
+      });
+    });
+
+    symbols.forEach((el, idx) => {
+      el.addEventListener("change", (e) => {
+        weeks[wIdx].cassettes[idx].symbol = e.target.value;
+        renderA4Preview();
+        saveData();
+      });
+    });
+  }
+
+  function renderA4Preview() {
+    const previewArea = document.getElementById("a4Preview");
+    previewArea.innerHTML = "";
+
+    weeks.forEach((w) => {
+      const card = document.createElement("div");
+      card.className = "locker-card";
+
+      const startStr = formatDateStr(w.startDate);
+      const endStr = formatDateStr(w.endDate);
+
+      // 教科ごとグループ化 (英語、数学、国語などの同じ教科枠にまとまる)
+      const grouped = {};
+      w.tasks.forEach(t => {
+        if (!grouped[t.subjectName]) grouped[t.subjectName] = [];
+        grouped[t.subjectName].push(t);
+      });
+
+      let bodyHTML = "";
+      for (const [subName, taskList] of Object.entries(grouped)) {
+        bodyHTML += `<div class="subject-group-print">`;
+        bodyHTML += `<div class="subject-title-print">${escapeHtml(subName)}</div>`;
+        taskList.forEach(t => {
+          bodyHTML += `
+            <div class="task-line-print">
+              <div class="checkbox-box"></div>
+              <div>
+                <span class="task-name-print">${escapeHtml(t.name)}</span>
+                <span class="task-detail-print">${escapeHtml(t.detail ? `[${t.detail}]` : '')}</span>
+              </div>
+            </div>
+          `;
+        });
+        bodyHTML += `</div>`;
+      }
+
+      // カセット印刷文字列生成
+      let cassetteHTML = "";
+      if (w.cassettes && w.cassettes.length > 0) {
+        cassetteHTML = w.cassettes.map(c => `${formatDateStr(c.date)} カセット : ${c.symbol}`).join("<br>");
+      } else {
+        cassetteHTML = "カセット : なし";
+      }
+
+      card.innerHTML = `
+        <div class="card-header-print">
+          <div class="date-range">${startStr} ➔ ${endStr}</div>
+          <div class="sub-info">
+            <span>WEEKLY ASSIGNMENTS</span>
+            <span>提出期限: ${endStr}</span>
+          </div>
+        </div>
+        <div class="card-body-print">
+          ${bodyHTML || '<p style="font-size:8pt; color:#999;">登録された課題はありません</p>'}
+        </div>
+        <div class="card-footer-print">
+          <div class="cassette-print-area">${cassetteHTML}</div>
+          <div class="complete-check-area">□ ALL COMPLETE</div>
+        </div>
+      `;
+
+      previewArea.appendChild(card);
+    });
+  }
+
+  function addWeek() {
+    const num = weeks.length + 1;
+    weeks.push({
+      id: "w" + Date.now(),
+      startDate: "2026-11-23",
+      endDate: "2026-11-30",
+      tasks: [],
+      cassettes: []
+    });
+    renderAll();
+  }
+
+  function removeWeek(wIdx) {
+    weeks.splice(wIdx, 1);
+    renderAll();
+  }
+
+  function addTask(wIdx) {
+    const subIdx = document.getElementById(`subSelect_${wIdx}`).value;
+    const matIdx = document.getElementById(`matSelect_${wIdx}`).value;
+    const subObj = MASTER_SUBJECTS[subIdx];
+    const matObj = subObj.materials[matIdx];
+
+    let taskSubjectName = subObj.name;
+    let taskName = "";
+    let isPage = false;
+
+    if (matObj.type === 'custom') {
+      const customName = document.getElementById(`customTaskNameInput_${wIdx}`).value.trim();
+      if (!customName) { alert("教材・課題名を入力してください。"); return; }
+      taskName = customName;
+      isPage = document.getElementById(`customTypeSelect_${wIdx}`).value === 'page';
+    } else {
+      taskName = matObj.name;
+      isPage = matObj.type === 'page';
+    }
+
+    let detailFormatted = "";
+
+    if (isPage) {
+      const container = document.getElementById(`pageRangesContainer_${wIdx}`);
+      const rows = container.querySelectorAll(".page-range-row");
+      const parts = [];
+
+      rows.forEach(row => {
+        const startVal = row.querySelector(".p-start").value.trim();
+        const endVal = row.querySelector(".p-end").value.trim();
+
+        if (startVal && endVal) {
+          parts.push(`${startVal}〜${endVal}`);
+        } else if (startVal) {
+          parts.push(`${startVal}`);
+        }
+      });
+
+      if (parts.length === 0) {
+        alert("ページ範囲を入力してください。");
+        return;
+      }
+      detailFormatted = "P." + parts.join(", ");
+    } else {
+      const printInput = document.getElementById(`printDetailInput_${wIdx}`);
+      detailFormatted = printInput ? printInput.value.trim() : "";
+    }
+
+    weeks[wIdx].tasks.push({
+      subjectName: taskSubjectName,
+      name: taskName,
+      type: isPage ? 'page' : 'boolean',
+      detail: detailFormatted
+    });
+
+    renderAll();
+  }
+
+  function removeTask(wIdx, tIdx) {
+    weeks[wIdx].tasks.splice(tIdx, 1);
+    renderAll();
+  }
+
+  function formatDateStr(dateVal) {
+    if (!dateVal) return "--/--";
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "--/--";
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  }
+
+  function escapeHtml(str) {
+    return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // --- ローカルストレージ保存関数 ---
+  function saveData() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(weeks));
+    } catch (e) {
+      console.error("保存に失敗しました", e);
+    }
+  }
+
+  function loadSavedData() {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      return saved ? JSON.parse(saved) : DEFAULT_WEEKS;
+    } catch (e) {
+      return DEFAULT_WEEKS;
+    }
+  }
+
+  function resetData() {
+    if (confirm("入力データを初期化しますか？")) {
+      localStorage.removeItem(STORAGE_KEY);
+      weeks = JSON.parse(JSON.stringify(DEFAULT_WEEKS));
+      renderAll();
+    }
+  }
+</script>
+
+</body>
+</html>
