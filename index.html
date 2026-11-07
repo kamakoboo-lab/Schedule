@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ロッカー用 課題表カード生成アプリ</title>
+  <!-- html2canvasライブラリの読み込み -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     /* 全体基本スタイル (画面表示用) */
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f7f7f7; color: #111; padding: 20px; line-height: 1.4; }
     .container { max-width: 900px; margin: 0 auto; }
 
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #111; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid #111; flex-wrap: wrap; gap: 10px; }
     h1 { font-size: 18px; font-weight: 700; }
     p.sub { font-size: 12px; color: #666; }
 
@@ -33,6 +35,8 @@
     .btn-outline:hover { background: #f0f0f0; }
     .btn-danger { background: #fff; border: 1px solid #fca5a5; color: #dc2626; }
     .btn-danger:hover { background: #fef2f2; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
 
     .week-block { background: #fafafa; border: 1px solid #e5e5e5; border-radius: 8px; padding: 14px; margin-bottom: 12px; }
     .week-header { 
@@ -112,7 +116,7 @@
     .task-name-print { font-weight: 600; color: #111; }
     .task-detail-print { color: #444; margin-left: 3px; font-size: 7.5pt; }
 
-    /* カードフッター (カセット表示 & チェック欄) */
+    /* カードフッター (カセット表示 & チェック欄) - 日付＆記号全体に色適用 */
     .card-footer-print {
       border-top: 1px solid #111;
       padding-top: 4px;
@@ -124,6 +128,14 @@
     }
     .cassette-print-area { font-weight: 700; color: #111; }
     .complete-check-area { font-weight: 600; color: #555; font-size: 7pt; white-space: nowrap; }
+
+    /* 画像表示用モーダル */
+    #imageModal {
+      display: none; position: fixed; z-index: 9999; left: 0; top: 0; width: 100%; height: 100%;
+      background-color: rgba(0,0,0,0.8); justify-content: center; align-items: center; flex-direction: column; padding: 20px;
+    }
+    #imageModal img { max-width: 100%; max-height: 80vh; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+    #imageModal .close-btn { margin-top: 15px; background: #fff; color: #111; padding: 10px 20px; border-radius: 6px; font-weight: bold; }
 
     /* 印刷時スタイル */
     @media print {
@@ -156,9 +168,10 @@
       <h1>ロッカー用 課題表カード生成アプリ</h1>
       <p class="sub">週ごとの課題を選択して、A4用紙（90.2mm×126.2mm×4枚）で印刷できます</p>
     </div>
-    <div style="display:flex; gap:8px;">
+    <div style="display:flex; gap:8px; flex-wrap: wrap;">
       <button type="button" class="btn-outline" onclick="resetData()">データを初期化</button>
-      <button type="button" class="btn-black" onclick="window.print()">印刷する (A4用紙)</button>
+      <button type="button" class="btn-primary" onclick="generateImageView()">🖼️ カードを画像で表示</button>
+      <button type="button" class="btn-black" onclick="window.print()">🖨️ 直接印刷 (A4)</button>
     </div>
   </header>
 
@@ -178,21 +191,27 @@
   <div class="a4-page" id="a4Preview"></div>
 </div>
 
-<script>
-  const STORAGE_KEY = "locker_task_app_data_v2";
+<!-- 画像表示モーダル -->
+<div id="imageModal">
+  <p style="color:#fff; margin-bottom:10px; font-size:14px; text-align:center;">画像を長押しして「写真に追加（保存）」してください</p>
+  <img id="resultImage" alt="生成されたカード画像">
+  <button class="close-btn" onclick="closeModal()">閉じる</button>
+</div>
 
-  // A〜Jの記号ごとのHSLカラー定義 (Aはミドルグレーに調整済み)
+<script>
+  const STORAGE_KEY = "locker_task_app_data_v3";
+
   const CASSETTE_COLORS = {
-    "A": "hsl(31, 10%, 55%)",
+    "A": "hsl(0, 0%, 45%)",
     "B": "hsl(210, 70%, 45%)",
     "C": "hsl(150, 60%, 35%)",
-    "D": "hsl(34, 91%, 50%)",
-    "E": "hsl(279, 55%, 50%)",
-    "F": "hsl(339, 75%, 55%)",
+    "D": "hsl(35, 90%, 50%)",
+    "E": "hsl(280, 55%, 50%)",
+    "F": "hsl(340, 75%, 55%)",
     "G": "hsl(185, 65%, 40%)",
-    "H": "hsl(15, 77%, 55%)",
+    "H": "hsl(15, 80%, 55%)",
     "I": "hsl(60, 70%, 45%)",
-    "J": "hsl(240, 45%, 50%)"
+    "J": "hsl(240, 15%, 50%)"
   };
 
   const MASTER_SUBJECTS = [
@@ -301,7 +320,6 @@
         </div>
       `;
 
-      // 登録済み課題
       html += `<div style="margin-bottom:8px;">`;
       w.tasks.forEach((t, tIdx) => {
         html += `
@@ -316,7 +334,6 @@
       });
       html += `</div>`;
 
-      // 課題追加フォーム
       html += `
         <div class="task-form">
           <label>＋ 新しい課題を選択して追加</label>
@@ -335,7 +352,6 @@
         </div>
       `;
 
-      // カセット授業設定エリア
       html += `
         <div class="cassette-section">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
@@ -366,7 +382,6 @@
       block.innerHTML = html;
       area.appendChild(block);
 
-      // イベントリスナー
       const startInput = document.getElementById(`start_${wIdx}`);
       const endInput = document.getElementById(`end_${wIdx}`);
       startInput.addEventListener("change", (e) => { weeks[wIdx].startDate = e.target.value; renderAll(); });
@@ -386,7 +401,6 @@
       bindCassetteEvents(wIdx);
     });
 
-    // ボタンリスナーバインド
     document.querySelectorAll(".remove-week-btn").forEach(btn => {
       btn.addEventListener("click", (e) => removeWeek(parseInt(e.target.dataset.index, 10)));
     });
@@ -523,7 +537,6 @@
       const startStr = formatDateStr(w.startDate);
       const endStr = formatDateStr(w.endDate);
 
-      // 教科ごとグループ化
       const grouped = {};
       w.tasks.forEach(t => {
         if (!grouped[t.subjectName]) grouped[t.subjectName] = [];
@@ -548,7 +561,6 @@
         bodyHTML += `</div>`;
       }
 
-      // カセット印刷文字列生成 (日付と記号の全体に色を適用)
       let cassetteHTML = "";
       if (w.cassettes && w.cassettes.length > 0) {
         cassetteHTML = w.cassettes.map(c => {
@@ -558,7 +570,7 @@
       } else {
         cassetteHTML = "カセット : なし";
       }
-      
+
       card.innerHTML = `
         <div class="card-header-print">
           <div class="date-range">${startStr} ➔ ${endStr}</div>
@@ -667,6 +679,24 @@
 
   function escapeHtml(str) {
     return (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  // --- 画像直接表示関数（スマホ対応） ---
+  function generateImageView() {
+    const target = document.getElementById("a4Preview");
+    
+    html2canvas(target, { scale: 2, useCORS: true }).then(canvas => {
+      const dataUrl = canvas.toDataURL("image/png");
+      document.getElementById("resultImage").src = dataUrl;
+      document.getElementById("imageModal").style.display = "flex";
+    }).catch(err => {
+      console.error("画像生成エラー", err);
+      alert("画像の生成に失敗しました。");
+    });
+  }
+
+  function closeModal() {
+    document.getElementById("imageModal").style.display = "none";
   }
 
   // --- ローカルストレージ保存関数 ---
