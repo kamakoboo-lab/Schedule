@@ -72,13 +72,13 @@
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
 
-    /* ロッカー貼付用カード (90.2mm x 126.2mm) */
+    /* ロッカー貼付用カード (90.2mm x 126.2mm) - 上下1.3cm(13mm)のホルダー隠れ対策パディング */
     .locker-card {
       width: 90.2mm;
       height: 126.2mm;
       border: 1.5px solid #111;
       border-radius: 4px;
-      padding: 7mm 8mm;
+      padding: 13mm 8mm 13mm 8mm; 
       display: flex;
       flex-direction: column;
       justify-content: space-between;
@@ -548,7 +548,7 @@
         bodyHTML += `</div>`;
       }
 
-      // カセット印刷文字列生成 (記号だけに色を適用)
+      // 【修正箇所】カセット印刷文字列生成 (記号だけに色を適用)
       let cassetteHTML = "";
       if (w.cassettes && w.cassettes.length > 0) {
         cassetteHTML = w.cassettes.map(c => {
@@ -623,20 +623,6 @@
       const rows = container.querySelectorAll(".page-range-row");
       const parts = [];
 
-      rows.forEach(row => {
-        const startVal = row.querySelector(".p-start").value.trim();
-        const endVal = row.querySelector(".p-end").value.trim();
-
-        if (startVal && endVal) {
-          parts.path ? parts.push(`${startVal}〜${endVal}`) : parts.push(`${startVal}〜${endVal}`);
-        } else if (startVal) {
-          parts.push(`${startVal}`);
-        }
-      });
-
-      // 修正: 確実に正しくパーツをプッシュする処理
-      // (上の三項演算子の部分をすっきり書き直したもの)
-      parts.length = 0; // 一度クリアして正しいロジックで再取得
       rows.forEach(row => {
         const startVal = row.querySelector(".p-start").value.trim();
         const endVal = row.querySelector(".p-end").value.trim();
